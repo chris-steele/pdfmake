@@ -1,0 +1,73 @@
+--- /home/chris/Desktop/pdfmake.v0.1.54.js
++++ /home/chris/Desktop/pdfmake-v0.1.54-issue-1159-fix.js
+@@ -17996,7 +17996,23 @@
+ 	if (!cb) {
+ 		throw 'getBuffer is an async method and needs a callback argument';
+ 	}
++
+ 	var doc = this._createDoc(options);
++
++	var hasDontBreakRowsBug = !global.__tableNodes ? [] : global.__tableNodes.filter(function(item) {
++		return item.dontBreakRowsBug === true;
++	});
++
++	if (hasDontBreakRowsBug.length > 0) {
++		hasDontBreakRowsBug.forEach(function(item) {
++			item.tableNode.table.dontBreakRows = false;
++			item.tableNode.table.headerRows = 0;
++			item.tableNode.table.keepWithHeaderRows = false;
++		});
++		global.__tableNodes = [];
++		doc = this._createDoc(options);
++	}
++
+ 	this._flushDoc(doc, function (buffer) {
+ 		cb(buffer);
+ 	});
+@@ -58803,6 +58819,7 @@
+ var isFunction = __webpack_require__(0).isFunction;
+ var TextTools = __webpack_require__(134);
+ var StyleContextStack = __webpack_require__(202);
++var global = __webpack_require__(22);
+ 
+ function addAll(target, otherArray) {
+ 	otherArray.forEach(function (item) {
+@@ -58823,6 +58840,8 @@
+ 	this.tracker = new TraversalTracker();
+ 	this.imageMeasure = imageMeasure;
+ 	this.tableLayouts = {};
++
++	global.__maxPageHeight = pageSize.height - (pageMargins.top + pageMargins.bottom);
+ }
+ 
+ LayoutBuilder.prototype.registerTableLayouts = function (tableLayouts) {
+@@ -59366,6 +59385,9 @@
+ // tables
+ LayoutBuilder.prototype.processTable = function (tableNode) {
+ 	var processor = new TableProcessor(tableNode);
++
++	if (!global.__tableNodes) global.__tableNodes = [];
++	global.__tableNodes.push({'tableNode':tableNode, 'dontBreakRowsBug':false});
+ 
+ 	processor.beginTable(this.writer);
+ 
+@@ -61363,6 +61385,7 @@
+ 
+ var isUndefined = __webpack_require__(0).isUndefined;
+ var ElementWriter = __webpack_require__(433);
++var global = __webpack_require__(22);
+ 
+ /**
+  * Creates an instance of PageElementWriter - an extended ElementWriter
+@@ -61485,6 +61508,10 @@
+ 				}
+ 			} else {
+ 				fragment.height = unbreakableContext.y;
++			}
++
++			if (unbreakableContext.y >= global.__maxPageHeight) {
++				global.__tableNodes[global.__tableNodes.length - 1].dontBreakRowsBug = true;
+ 			}
+ 
+ 			if (forcedX !== undefined || forcedY !== undefined) {
+
